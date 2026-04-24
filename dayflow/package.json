@@ -1,0 +1,26 @@
+{
+  "name": "dayflow",
+  "version": "1.0.0",
+  "description": "Daily task and timeline manager with Eisenhower matrix",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac",
+    "pack": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.dayflow.app",
+    "productName": "DayFlow",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": ["dmg", "zip"]
+    },
+    "directories": {
+      "output": "dist"
+    }
+  }
+}

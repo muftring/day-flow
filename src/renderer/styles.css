@@ -1152,7 +1152,95 @@ html, body {
 :root.light .timeline-card {
   box-shadow: 0 2px 8px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08);
 }
-::-webkit-scrollbar { width: 5px; height: 5px; }
+
+/* ── Tags ─────────────────────────────────────────────────────────────────── */
+
+/* Task item layout for tags */
+.task-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.task-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.task-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--tag-color) 18%, transparent);
+  color: var(--tag-color);
+  border: 1px solid color-mix(in srgb, var(--tag-color) 40%, transparent);
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+
+.task-tag-chip:hover {
+  background: color-mix(in srgb, var(--tag-color) 30%, transparent);
+}
+
+/* Align complete button to top in multi-line task items */
+.task-item {
+  align-items: flex-start !important;
+}
+.task-item .task-complete-btn { margin-top: 1px; }
+.task-item .task-actions       { margin-top: 0px; }
+.task-item .task-priority-badge{ margin-top: 2px; }
+
+/* Tag filter bar */
+.tag-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 0 16px 10px;
+  flex-shrink: 0;
+}
+
+.tag-filter-pill {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-mid);
+  border-radius: 99px;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+
+.tag-filter-pill:hover {
+  border-color: var(--border-bright);
+  color: var(--text-primary);
+}
+
+.tag-filter-pill.active {
+  background: color-mix(in srgb, var(--tag-color, transparent) 16%, var(--bg-active));
+  border-color: var(--tag-color, var(--border-bright));
+  color: var(--tag-color, var(--text-primary));
+}
+
+/* "All" pill has no --tag-color */
+.tag-filter-pill:first-child.active {
+  --tag-color: var(--accent-gold);
+  background: color-mix(in srgb, var(--accent-gold) 12%, var(--bg-active));
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+
+
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-bright); }

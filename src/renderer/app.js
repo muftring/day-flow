@@ -8,9 +8,10 @@ const app = (() => {
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let state = {
-  tasks: [],          // { id, title, completed, priority, createdAt }
+  tasks: [],          // { id, title, completed, priority, tags: [], createdAt }
   timelineItems: [],  // { id, taskId, taskTitle, date, startMin, durationMin, color, completed }
   blockedTimes: [],   // { id, label, date, startMin, durationMin, bg, fg }
+  tags: [],           // { id, name, color }
   settings: { workStart: '08:00', workEnd: '18:00', theme: 'dark' }
 };
 
@@ -19,6 +20,7 @@ currentDate.setHours(0,0,0,0);
 
 let dragPayload = null;  // { type: 'task'|'timeline', data }
 let pendingSchedule = null; // task waiting for duration modal
+let activeTagFilter = null; // tag id or null
 
 const QUADRANT_COLORS = {
   do:        { bg: '#3d1515', border: '#e05a5a', text: '#f4b8b8' },
@@ -47,6 +49,7 @@ async function loadData() {
       state.tasks         = saved.tasks        || [];
       state.timelineItems = saved.timelineItems|| [];
       state.blockedTimes  = saved.blockedTimes || [];
+      state.tags          = saved.tags         || [];
       if (saved.settings)  state.settings = { ...state.settings, ...saved.settings };
     }
   } catch(e) { console.warn('Load failed', e); }
@@ -58,6 +61,7 @@ async function saveData() {
       tasks: state.tasks,
       timelineItems: state.timelineItems,
       blockedTimes: state.blockedTimes,
+      tags: state.tags,
       settings: state.settings
     });
   } catch(e) { console.warn('Save failed', e); }
@@ -96,6 +100,7 @@ function toggleTheme() {
 
 function renderAll() {
   renderDateHeader();
+  renderTagFilterBar();
   renderTaskList();
   renderMatrix();
   renderTimeline();
@@ -140,10 +145,12 @@ function renderTaskList() {
   const ul = document.getElementById('task-list');
   ul.innerHTML = '';
 
-  const visible = state.tasks.filter(t =>
-    !t.completed &&
-    (filter === 'all' || t.priority === filter || (filter === 'none' && !t.priority))
-  );
+  const visible = state.tasks.filter(t => {
+    if (t.completed) return false;
+    if (filter !== 'all' && !(t.priority === filter || (filter === 'none' && !t.priority))) return false;
+    if (activeTagFilter && !(t.tags || []).includes(activeTagFilter)) return false;
+    return true;
+  });
 
   visible.forEach(task => {
     const li = document.createElement('li');
@@ -154,11 +161,20 @@ function renderTaskList() {
     const badge = task.priority ?
       `<span class="task-priority-badge badge-${task.priority}">${shortLabel(task.priority)}</span>` : '';
 
+    const taskTags = (task.tags || []).map(tid => {
+      const tag = state.tags.find(tg => tg.id === tid);
+      return tag ? `<span class="task-tag-chip" style="--tag-color:${tag.color}" data-tag-id="${tag.id}">${escHtml(tag.name)}</span>` : '';
+    }).join('');
+
     li.innerHTML = `
       <button class="task-complete-btn" title="Mark complete">${task.completed ? '✓' : ''}</button>
-      <span class="task-title">${escHtml(task.title)}</span>
+      <div class="task-main">
+        <span class="task-title">${escHtml(task.title)}</span>
+        ${taskTags ? `<div class="task-tag-row">${taskTags}</div>` : ''}
+      </div>
       ${badge}
       <div class="task-actions">
+        <button class="task-action-btn" title="Add/edit tags" data-action="tags">⊕</button>
         <button class="task-action-btn" title="Set priority" data-action="priority">◈</button>
         <button class="task-action-btn" title="Delete" data-action="delete">✕</button>
       </div>
@@ -182,12 +198,24 @@ function renderTaskList() {
       toggleTaskComplete(task.id);
     });
 
+    // Tag chips — click to filter by that tag
+    li.querySelectorAll('.task-tag-chip').forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tid = chip.dataset.tagId;
+        activeTagFilter = activeTagFilter === tid ? null : tid;
+        renderTagFilterBar();
+        renderTaskList();
+      });
+    });
+
     // Action buttons
     li.querySelectorAll('.task-action-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (btn.dataset.action === 'delete') deleteTask(task.id);
+        if (btn.dataset.action === 'delete')   deleteTask(task.id);
         if (btn.dataset.action === 'priority') showPriorityMenu(task.id, btn);
+        if (btn.dataset.action === 'tags')     showTagMenu(task.id, btn);
       });
     });
 
@@ -196,7 +224,7 @@ function renderTaskList() {
 
   // Completed section
   const done = state.tasks.filter(t => t.completed);
-  if (done.length && filter === 'all') {
+  if (done.length && filter === 'all' && !activeTagFilter) {
     const sep = document.createElement('li');
     sep.style.cssText = 'padding: 10px 0 4px; font-size:10px; color: var(--text-muted); text-transform:uppercase; letter-spacing:.08em;';
     sep.textContent = `Completed (${done.length})`;
@@ -295,7 +323,268 @@ function showPriorityMenu(taskId, btn) {
   setTimeout(() => document.addEventListener('click', () => menu.remove(), { once: true }), 10);
 }
 
-// ── Matrix ────────────────────────────────────────────────────────────────────
+// ── Tags ──────────────────────────────────────────────────────────────────────
+
+const TAG_PALETTE = [
+  '#e05a5a','#e07a3a','#d4a843','#7ab843','#3ab87a',
+  '#3ab8c4','#3a7ae0','#7a3ae0','#c43ab8','#e03a7a'
+];
+
+function getAllTagsUsed() {
+  const used = new Set();
+  state.tasks.forEach(t => (t.tags || []).forEach(id => used.add(id)));
+  return state.tags.filter(tg => used.has(tg.id));
+}
+
+function renderTagFilterBar() {
+  const bar = document.getElementById('tag-filter-bar');
+  if (!bar) return;
+  bar.innerHTML = '';
+
+  const usedTags = getAllTagsUsed();
+  if (usedTags.length === 0) {
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = 'flex';
+
+  // "All" pill
+  const allPill = document.createElement('button');
+  allPill.className = 'tag-filter-pill' + (!activeTagFilter ? ' active' : '');
+  allPill.textContent = 'All';
+  allPill.addEventListener('click', () => {
+    activeTagFilter = null;
+    renderTagFilterBar();
+    renderTaskList();
+  });
+  bar.appendChild(allPill);
+
+  usedTags.forEach(tag => {
+    const pill = document.createElement('button');
+    pill.className = 'tag-filter-pill' + (activeTagFilter === tag.id ? ' active' : '');
+    pill.style.setProperty('--tag-color', tag.color);
+    pill.textContent = tag.name;
+    pill.addEventListener('click', () => {
+      activeTagFilter = activeTagFilter === tag.id ? null : tag.id;
+      renderTagFilterBar();
+      renderTaskList();
+    });
+    bar.appendChild(pill);
+  });
+}
+
+function showTagMenu(taskId, btn) {
+  document.querySelectorAll('.tag-menu').forEach(m => m.remove());
+
+  const task = state.tasks.find(t => t.id === taskId);
+  if (!task) return;
+  if (!task.tags) task.tags = [];
+
+  const menu = document.createElement('div');
+  menu.className = 'tag-menu';
+  menu.style.cssText = `
+    position: fixed; z-index: 500; background: var(--bg-raised);
+    border: 1px solid var(--border-mid); border-radius: var(--radius-md);
+    padding: 8px; display: flex; flex-direction: column; gap: 4px;
+    box-shadow: var(--shadow-float); min-width: 200px;
+  `;
+
+  // Header
+  const header = document.createElement('div');
+  header.style.cssText = 'font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--text-muted); padding: 2px 4px 6px; border-bottom: 1px solid var(--border-subtle); margin-bottom:2px;';
+  header.textContent = 'Tags';
+  menu.appendChild(header);
+
+  // Existing tags
+  state.tags.forEach(tag => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; align-items:center; gap:8px; padding:5px 6px; border-radius:5px; cursor:pointer; transition:background .1s;';
+    const hasTag = task.tags.includes(tag.id);
+    row.innerHTML = `
+      <span style="width:10px;height:10px;border-radius:50%;background:${tag.color};flex-shrink:0;"></span>
+      <span style="flex:1;font-size:12px;color:var(--text-primary);">${escHtml(tag.name)}</span>
+      <span style="font-size:13px;color:var(--text-muted);">${hasTag ? '✓' : ''}</span>
+    `;
+    row.addEventListener('mouseenter', () => row.style.background = 'var(--bg-active)');
+    row.addEventListener('mouseleave', () => row.style.background = 'none');
+    row.addEventListener('click', () => {
+      toggleTaskTag(taskId, tag.id);
+      menu.remove();
+    });
+    menu.appendChild(row);
+  });
+
+  // Divider + Create new tag
+  const divider = document.createElement('div');
+  divider.style.cssText = 'border-top:1px solid var(--border-subtle); margin: 4px 0;';
+  menu.appendChild(divider);
+
+  const createRow = document.createElement('div');
+  createRow.style.cssText = 'display:flex; align-items:center; gap:6px; padding:4px 6px;';
+  createRow.innerHTML = `
+    <input class="new-tag-input" type="text" placeholder="New tag name…" style="
+      flex:1; background:var(--bg-surface); border:1px solid var(--border-mid);
+      border-radius:var(--radius-sm); color:var(--text-primary); font-family:var(--font-sans);
+      font-size:12px; padding:5px 8px; outline:none;
+    "/>
+    <div class="new-tag-color-dot" style="width:14px;height:14px;border-radius:50%;background:${TAG_PALETTE[0]};cursor:pointer;flex-shrink:0;border:2px solid rgba(255,255,255,0.3);"></div>
+    <button class="new-tag-add-btn" style="
+      background:var(--accent-gold); border:none; border-radius:4px; color:#0b0b10;
+      font-size:11px; font-weight:600; padding:4px 8px; cursor:pointer;
+    ">Add</button>
+  `;
+  menu.appendChild(createRow);
+
+  // Color picker on dot click
+  let newTagColor = TAG_PALETTE[0];
+  const dot = createRow.querySelector('.new-tag-color-dot');
+  dot.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showColorPicker(dot, TAG_PALETTE, (color) => {
+      newTagColor = color;
+      dot.style.background = color;
+    });
+  });
+
+  // Add button
+  const addBtn = createRow.querySelector('.new-tag-add-btn');
+  const input  = createRow.querySelector('.new-tag-input');
+  const doCreate = () => {
+    const name = input.value.trim();
+    if (!name) return;
+    const newTag = { id: uid(), name, color: newTagColor };
+    state.tags.push(newTag);
+    toggleTaskTag(taskId, newTag.id);
+    menu.remove();
+  };
+  addBtn.addEventListener('click', doCreate);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') doCreate(); e.stopPropagation(); });
+
+  // Manage tags link
+  if (state.tags.length > 0) {
+    const manageRow = document.createElement('div');
+    manageRow.style.cssText = 'padding:4px 6px;';
+    const manageBtn = document.createElement('button');
+    manageBtn.style.cssText = 'background:none;border:none;color:var(--text-muted);font-size:11px;cursor:pointer;padding:2px 0;';
+    manageBtn.textContent = 'Manage tags…';
+    manageBtn.addEventListener('click', () => { menu.remove(); openManageTagsModal(); });
+    manageRow.appendChild(manageBtn);
+    menu.appendChild(manageRow);
+  }
+
+  const rect = btn.getBoundingClientRect();
+  menu.style.top  = `${rect.bottom + 4}px`;
+  menu.style.left = `${Math.max(0, rect.right - 200)}px`;
+  document.body.appendChild(menu);
+  input.focus();
+  setTimeout(() => document.addEventListener('click', () => menu.remove(), { once: true }), 10);
+}
+
+function showColorPicker(anchor, palette, onSelect) {
+  document.querySelectorAll('.color-picker-popup').forEach(p => p.remove());
+  const popup = document.createElement('div');
+  popup.className = 'color-picker-popup';
+  popup.style.cssText = `
+    position:fixed; z-index:600; background:var(--bg-raised); border:1px solid var(--border-mid);
+    border-radius:var(--radius-sm); padding:8px; display:flex; flex-wrap:wrap; gap:5px;
+    box-shadow:var(--shadow-float); width:138px;
+  `;
+  palette.forEach(color => {
+    const dot = document.createElement('div');
+    dot.style.cssText = `width:18px;height:18px;border-radius:50%;background:${color};cursor:pointer;transition:transform .1s;`;
+    dot.addEventListener('mouseenter', () => dot.style.transform = 'scale(1.2)');
+    dot.addEventListener('mouseleave', () => dot.style.transform = 'scale(1)');
+    dot.addEventListener('click', (e) => { e.stopPropagation(); onSelect(color); popup.remove(); });
+    popup.appendChild(dot);
+  });
+  const rect = anchor.getBoundingClientRect();
+  popup.style.top  = `${rect.bottom + 4}px`;
+  popup.style.left = `${rect.left - 60}px`;
+  document.body.appendChild(popup);
+  setTimeout(() => document.addEventListener('click', () => popup.remove(), { once: true }), 10);
+}
+
+function toggleTaskTag(taskId, tagId) {
+  const task = state.tasks.find(t => t.id === taskId);
+  if (!task) return;
+  if (!task.tags) task.tags = [];
+  const idx = task.tags.indexOf(tagId);
+  if (idx === -1) task.tags.push(tagId);
+  else            task.tags.splice(idx, 1);
+  renderTagFilterBar();
+  renderTaskList();
+  debouncedSave();
+}
+
+function openManageTagsModal() {
+  document.querySelectorAll('.manage-tags-modal').forEach(m => m.remove());
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay manage-tags-modal';
+  overlay.innerHTML = `
+    <div class="modal" style="min-width:320px;">
+      <h2>Manage Tags</h2>
+      <div id="manage-tags-list" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;"></div>
+      <div class="modal-actions">
+        <button class="btn-primary" id="manage-tags-close-btn">Done</button>
+      </div>
+    </div>
+  `;
+
+  function refreshList() {
+    const list = overlay.querySelector('#manage-tags-list');
+    list.innerHTML = '';
+    if (state.tags.length === 0) {
+      list.innerHTML = '<span style="color:var(--text-muted);font-size:12px;">No tags yet.</span>';
+      return;
+    }
+    state.tags.forEach(tag => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 8px;background:var(--bg-surface);border-radius:var(--radius-sm);border:1px solid var(--border-subtle);';
+      row.innerHTML = `
+        <div class="tag-color-swatch" data-tag-id="${tag.id}" style="width:14px;height:14px;border-radius:50%;background:${tag.color};cursor:pointer;flex-shrink:0;border:2px solid rgba(255,255,255,0.2);"></div>
+        <span style="flex:1;font-size:13px;color:var(--text-primary);">${escHtml(tag.name)}</span>
+        <button class="rename-tag-btn" data-tag-id="${tag.id}" style="background:none;border:none;color:var(--text-muted);font-size:11px;cursor:pointer;padding:2px 5px;border-radius:3px;" title="Rename">✎</button>
+        <button class="delete-tag-btn" data-tag-id="${tag.id}" style="background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;padding:2px 5px;border-radius:3px;" title="Delete">✕</button>
+      `;
+      row.querySelector('.tag-color-swatch').addEventListener('click', (e) => {
+        showColorPicker(e.target, TAG_PALETTE, (color) => {
+          tag.color = color;
+          e.target.style.background = color;
+          renderTagFilterBar();
+          renderTaskList();
+          debouncedSave();
+        });
+      });
+      row.querySelector('.rename-tag-btn').addEventListener('click', () => {
+        const name = prompt('Rename tag:', tag.name);
+        if (name && name.trim()) {
+          tag.name = name.trim();
+          refreshList();
+          renderTagFilterBar();
+          renderTaskList();
+          debouncedSave();
+        }
+      });
+      row.querySelector('.delete-tag-btn').addEventListener('click', () => {
+        state.tags = state.tags.filter(tg => tg.id !== tag.id);
+        state.tasks.forEach(t => { if (t.tags) t.tags = t.tags.filter(id => id !== tag.id); });
+        if (activeTagFilter === tag.id) activeTagFilter = null;
+        refreshList();
+        renderTagFilterBar();
+        renderTaskList();
+        debouncedSave();
+      });
+      list.appendChild(row);
+    });
+  }
+
+  refreshList();
+  overlay.querySelector('#manage-tags-close-btn').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
 function renderMatrix() {
   ['do','schedule','delegate','eliminate'].forEach(q => {
     const el = document.getElementById(`q-${q}`);

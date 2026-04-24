@@ -87,45 +87,65 @@ ipcMain.on('show-notification', (_, { title, body, urgency }) => {
 
 // ── Calendar (macOS EventKit via AppleScript) ─────────────────────────────────
 
-ipcMain.handle('fetch-calendar-events', async (_, dateStr) => {
-  if (process.platform !== 'darwin') return [];
-  
-  const { execFile } = require('child_process');
-  const { promisify } = require('util');
-  const execFileAsync = promisify(execFile);
+ipcMain.handle('fetch-calendar-events', async (_, { year, month, day }) => {
+  if (process.platform !== 'darwin') return { events: [], error: null };
 
+  const { exec } = require('child_process');
+  const { promisify } = require('util');
+  const execAsync = promisify(exec);
+
+  // Build AppleScript using numeric date components to avoid locale issues
   const script = `
-    set targetDate to date "${dateStr}"
-    set startOfDay to targetDate
-    set startOfDay to startOfDay - (time of startOfDay)
-    set endOfDay to startOfDay + (24 * 60 * 60 - 1)
-    
-    set eventList to {}
-    tell application "Calendar"
-      repeat with cal in calendars
-        set calEvents to (every event of cal whose start date >= startOfDay and start date <= endOfDay)
-        repeat with evt in calEvents
-          set evtStart to start date of evt as string
-          set evtEnd to end date of evt as string
-          set evtTitle to summary of evt
-          set end of eventList to evtTitle & "|||" & evtStart & "|||" & evtEnd
-        end repeat
+tell application "Calendar"
+  set dayStart to current date
+  set year of dayStart to ${year}
+  set month of dayStart to ${month}
+  set day of dayStart to ${day}
+  set hours of dayStart to 0
+  set minutes of dayStart to 0
+  set seconds of dayStart to 0
+  set dayEnd to dayStart + (86399)
+  set output to ""
+  repeat with aCal in calendars
+    try
+      set evts to (every event of aCal whose start date >= dayStart and start date <= dayEnd)
+      repeat with e in evts
+        set eTitle to summary of e
+        set eStart to start date of e
+        set eEnd to end date of e
+        set eStartStr to (hours of eStart as string) & ":" & text -2 thru -1 of ("0" & (minutes of eStart as string))
+        set eEndStr to (hours of eEnd as string) & ":" & text -2 thru -1 of ("0" & (minutes of eEnd as string))
+        set output to output & eTitle & "|||" & eStartStr & "|||" & eEndStr & "\\n"
       end repeat
-    end tell
-    return eventList
-  `;
+    end try
+  end repeat
+  return output
+end tell`;
 
   try {
-    const { stdout } = await execFileAsync('osascript', ['-e', script], { timeout: 5000 });
-    const lines = stdout.trim().split(', ');
-    return lines
+    const { stdout, stderr } = await execAsync(`osascript << 'APPLESCRIPT'\n${script}\nAPPLESCRIPT`, {
+      timeout: 10000
+    });
+
+    if (stderr && stderr.includes('not authorized')) {
+      return { events: [], error: 'not_authorized' };
+    }
+
+    const events = stdout.trim().split('\n')
       .filter(l => l.includes('|||'))
       .map(line => {
-        const parts = line.split('|||');
-        return { title: parts[0], start: parts[1], end: parts[2] };
-      });
+        const [title, start, end] = line.split('|||');
+        return { title: title?.trim(), start: start?.trim(), end: end?.trim() };
+      })
+      .filter(e => e.title);
+
+    return { events, error: null };
   } catch (e) {
     console.warn('Calendar access failed:', e.message);
-    return [];
+    const errMsg = e.message || '';
+    if (errMsg.includes('not authorized') || errMsg.includes('1743')) {
+      return { events: [], error: 'not_authorized' };
+    }
+    return { events: [], error: 'failed' };
   }
 });

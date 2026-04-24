@@ -654,28 +654,34 @@ async function fetchCalendar() {
   el.innerHTML = '<span class="cal-empty">Loading…</span>';
 
   try {
-    const dateStr = currentDate.toLocaleDateString('en-US', {
-      month: 'long', day: 'numeric', year: 'numeric'
+    const result = await window.electronAPI.fetchCalendarEvents({
+      year:  currentDate.getFullYear(),
+      month: currentDate.getMonth() + 1,
+      day:   currentDate.getDate()
     });
-    const events = await window.electronAPI.fetchCalendarEvents(dateStr);
 
-    if (!events || events.length === 0) {
+    if (result.error === 'not_authorized') {
+      el.innerHTML = '<span class="cal-empty">Calendar access denied — go to System Settings → Privacy & Security → Calendars to allow DayFlow.</span>';
+      return;
+    }
+
+    if (!result.events || result.events.length === 0) {
       el.innerHTML = '<span class="cal-empty">No calendar events today</span>';
       return;
     }
 
     el.innerHTML = '';
-    events.forEach(evt => {
+    result.events.forEach(evt => {
       const chip = document.createElement('div');
       chip.className = 'cal-event-chip';
       chip.innerHTML = `
         <span class="cal-title">${escHtml(evt.title)}</span>
-        <span class="cal-time">${formatCalTime(evt.start)} – ${formatCalTime(evt.end)}</span>
+        <span class="cal-time">${escHtml(evt.start)} – ${escHtml(evt.end)}</span>
       `;
       el.appendChild(chip);
     });
   } catch(e) {
-    el.innerHTML = '<span class="cal-empty">Calendar access not available. Grant permission in System Settings → Privacy → Calendars.</span>';
+    el.innerHTML = '<span class="cal-empty">Could not load calendar events.</span>';
   }
 }
 

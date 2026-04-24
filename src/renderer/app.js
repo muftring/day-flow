@@ -11,7 +11,7 @@ let state = {
   tasks: [],          // { id, title, completed, priority, createdAt }
   timelineItems: [],  // { id, taskId, taskTitle, date, startMin, durationMin, color, completed }
   blockedTimes: [],   // { id, label, date, startMin, durationMin, bg, fg }
-  settings: { workStart: '08:00', workEnd: '18:00' }
+  settings: { workStart: '08:00', workEnd: '18:00', theme: 'dark' }
 };
 
 let currentDate = new Date();
@@ -31,6 +31,7 @@ const QUADRANT_COLORS = {
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   await loadData();
+  applyTheme(state.settings.theme || 'dark');
   renderAll();
   startClock();
   startTimerLoop();
@@ -68,7 +69,31 @@ function debounce(fn, ms) {
 }
 const debouncedSave = debounce(saveData, 600);
 
-// ── Render All ────────────────────────────────────────────────────────────────
+// ── Theme ─────────────────────────────────────────────────────────────────────
+function applyTheme(theme) {
+  const root = document.documentElement;
+  const icon  = document.getElementById('theme-icon');
+  const label = document.getElementById('theme-label');
+
+  if (theme === 'light') {
+    root.classList.add('light');
+    if (icon)  icon.textContent  = '☀️';
+    if (label) label.textContent = 'Light';
+  } else {
+    root.classList.remove('light');
+    if (icon)  icon.textContent  = '🌙';
+    if (label) label.textContent = 'Dark';
+  }
+  state.settings.theme = theme;
+}
+
+function toggleTheme() {
+  const next = state.settings.theme === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  debouncedSave();
+}
+
+
 function renderAll() {
   renderDateHeader();
   renderTaskList();
@@ -726,6 +751,9 @@ function hideDragGhost() {
 
 // ── Event Bindings ────────────────────────────────────────────────────────────
 function bindEvents() {
+  // Theme toggle
+  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+
   // Add task
   document.getElementById('add-task-btn').addEventListener('click', () => {
     const input = document.getElementById('new-task-input');
@@ -862,7 +890,8 @@ return {
   onTimelineDragOver,
   onTimelineDragLeave,
   onTimelineDrop,
-  dropOnQuadrant
+  dropOnQuadrant,
+  toggleTheme
 };
 
 })();

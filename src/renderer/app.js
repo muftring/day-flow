@@ -166,10 +166,23 @@ function renderTaskList() {
       return tag ? `<span class="task-tag-chip" style="--tag-color:${tag.color}" data-tag-id="${tag.id}">${escHtml(tag.name)}</span>` : '';
     }).join('');
 
+    // Show scheduled time if this task is on today's timeline
+    const todayScheduled = state.timelineItems.filter(i =>
+      i.taskId === task.id && i.date === dateKey(currentDate)
+    );
+    const scheduledBadge = todayScheduled.length > 0
+      ? todayScheduled.map(i =>
+          `<span class="task-scheduled-badge">⏱ ${minToTime(i.startMin)}</span>`
+        ).join('')
+      : '';
+
     li.innerHTML = `
       <button class="task-complete-btn" title="Mark complete">${task.completed ? '✓' : ''}</button>
       <div class="task-main">
-        <span class="task-title">${escHtml(task.title)}</span>
+        <div class="task-title-row">
+          <span class="task-title">${escHtml(task.title)}</span>
+          ${scheduledBadge}
+        </div>
         ${taskTags ? `<div class="task-tag-row">${taskTags}</div>` : ''}
       </div>
       ${badge}
@@ -707,9 +720,10 @@ function renderTimeline() {
 
     const endMin = item.startMin + item.durationMin;
     el.innerHTML = `
-      <span class="tc-title">${escHtml(item.taskTitle)}</span>
+      <span class="tc-title">${escHtml(item.taskTitle)} <span class="tc-scheduled-time">(${minToTime(item.startMin)})</span></span>
       <span class="tc-time">${minToTime(item.startMin)} – ${minToTime(endMin)}</span>
       <div class="tc-actions">
+        <button class="tc-btn" data-action="edit" title="Edit time">✎</button>
         <button class="tc-btn" data-action="complete" title="${item.completed?'Unmark':'Mark complete'}">${item.completed?'↺':'✓'}</button>
         <button class="tc-btn" data-action="remove" title="Remove from timeline">✕</button>
       </div>
@@ -720,7 +734,13 @@ function renderTimeline() {
         e.stopPropagation();
         if (btn.dataset.action === 'complete') toggleTimelineComplete(item.id);
         if (btn.dataset.action === 'remove')   removeTimelineItem(item.id);
+        if (btn.dataset.action === 'edit')     openTimelineEditPopover(item.id, el);
       });
+    });
+
+    // Also open edit on double-click of the card body
+    el.addEventListener('dblclick', (e) => {
+      if (!e.target.closest('.tc-btn')) openTimelineEditPopover(item.id, el);
     });
 
     container.appendChild(el);
@@ -738,6 +758,100 @@ function removeTimelineItem(id) {
   renderTimeline();
   debouncedSave();
 }
+
+function openTimelineEditPopover(itemId, cardEl) {
+  // Close any existing popover
+  document.querySelectorAll('.timeline-edit-popover').forEach(p => p.remove());
+
+  const item = state.timelineItems.find(i => i.id === itemId);
+  if (!item) return;
+
+  const popover = document.createElement('div');
+  popover.className = 'timeline-edit-popover';
+
+  const durOptions = [15, 30, 45, 60, 90, 120];
+
+  popover.innerHTML = `
+    <div class="tep-header">
+      <span class="tep-title">Edit Schedule</span>
+      <button class="tep-close">✕</button>
+    </div>
+    <label class="tep-label">Start time
+      <input class="tep-start" type="time" value="${minToTime(item.startMin)}" />
+    </label>
+    <label class="tep-label">Duration
+      <div class="tep-dur-btns">
+        ${durOptions.map(m => `<button class="tep-dur-btn${item.durationMin === m ? ' active' : ''}" data-min="${m}">${m < 60 ? m+'m' : (m/60)+'h'}</button>`).join('')}
+      </div>
+      <div class="tep-custom-row">
+        <input class="tep-minutes" type="number" min="5" max="480" value="${item.durationMin}" /> <span>min</span>
+      </div>
+    </label>
+    <div class="tep-actions">
+      <button class="tep-cancel btn-secondary">Cancel</button>
+      <button class="tep-save btn-primary">Save</button>
+    </div>
+  `;
+
+  // Position popover next to the card
+  document.body.appendChild(popover);
+  const cardRect = cardEl.getBoundingClientRect();
+  const popW = 220;
+  const spaceRight = window.innerWidth - cardRect.right;
+  const left = spaceRight >= popW + 12
+    ? cardRect.right + 8
+    : cardRect.left - popW - 8;
+  const top = Math.min(cardRect.top, window.innerHeight - popover.offsetHeight - 16);
+  popover.style.left = `${Math.max(8, left)}px`;
+  popover.style.top  = `${Math.max(8, top)}px`;
+
+  // Duration quick-select buttons
+  const minutesInput = popover.querySelector('.tep-minutes');
+  popover.querySelectorAll('.tep-dur-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      popover.querySelectorAll('.tep-dur-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      minutesInput.value = btn.dataset.min;
+    });
+  });
+
+  minutesInput.addEventListener('input', () => {
+    popover.querySelectorAll('.tep-dur-btn').forEach(b => b.classList.remove('active'));
+  });
+
+  // Save
+  popover.querySelector('.tep-save').addEventListener('click', () => {
+    const newStart = timeToMin(popover.querySelector('.tep-start').value);
+    const newDur   = Math.max(5, parseInt(minutesInput.value) || 30);
+    item.startMin    = newStart;
+    item.durationMin = newDur;
+    popover.remove();
+    renderTimeline();
+    renderTaskList(); // update sidebar scheduled badge
+    debouncedSave();
+    showToast('Updated', `Rescheduled to ${minToTime(newStart)}, ${newDur} min`, 'info');
+  });
+
+  // Cancel / close
+  const close = () => popover.remove();
+  popover.querySelector('.tep-cancel').addEventListener('click', close);
+  popover.querySelector('.tep-close').addEventListener('click', close);
+
+  // Click-outside to close
+  setTimeout(() => {
+    document.addEventListener('click', function handler(e) {
+      if (!popover.contains(e.target) && !cardEl.contains(e.target)) {
+        popover.remove();
+        document.removeEventListener('click', handler);
+      }
+    });
+  }, 10);
+
+  // Focus the start input
+  popover.querySelector('.tep-start').focus();
+}
+
+
 
 function toggleTimelineComplete(id) {
   const item = state.timelineItems.find(i => i.id === id);

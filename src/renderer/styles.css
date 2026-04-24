@@ -674,6 +674,44 @@ html, body {
   text-overflow: ellipsis;
 }
 
+.tc-scheduled-time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.65;
+  letter-spacing: 0.02em;
+}
+
+/* Task list scheduled badge */
+.task-title-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.task-title-row .task-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.task-scheduled-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent-teal);
+  background: color-mix(in srgb, var(--accent-teal) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-teal) 30%, transparent);
+  border-radius: 99px;
+  padding: 0px 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+
+
 .tc-time {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -1244,3 +1282,112 @@ html, body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-bright); }
+
+/* ── Timeline Edit Popover ────────────────────────────────────────────────── */
+.timeline-edit-popover {
+  position: fixed;
+  z-index: 300;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  width: 220px;
+  box-shadow: var(--shadow-float);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tep-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tep-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.tep-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: color 0.12s;
+}
+.tep-close:hover { color: var(--text-primary); }
+
+.tep-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+.tep-label input[type="time"],
+.tep-label input[type="number"] {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 6px 9px;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+.tep-label input:focus { border-color: var(--accent-gold-dim); }
+
+.tep-dur-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tep-dur-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 4px 7px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.tep-dur-btn:hover { border-color: var(--border-bright); color: var(--text-primary); }
+.tep-dur-btn.active {
+  background: var(--accent-gold-dim);
+  border-color: var(--accent-gold);
+  color: var(--text-primary);
+}
+
+.tep-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.tep-custom-row input { width: 70px; }
+
+.tep-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}

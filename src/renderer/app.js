@@ -1040,20 +1040,36 @@ function checkAlerts() {
       const startMin = item.startMin;
       const endMin   = item.startMin + item.durationMin;
 
-      // 1 min before start
-      const preStartKey = `pre-${item.id}`;
-      if (nowMin >= startMin - 1 && nowMin < startMin && !NOTIFIED.has(preStartKey)) {
-        NOTIFIED.add(preStartKey);
-        const msg = `"${item.taskTitle}" starts in 1 minute`;
+      // 5 min before start
+      const preStart5Key = `pre5-${item.id}`;
+      if (nowMin >= startMin - 5 && nowMin < startMin - 1 && !NOTIFIED.has(preStart5Key)) {
+        NOTIFIED.add(preStart5Key);
+        const msg = `"${item.taskTitle}" starts in 5 minutes`;
         fireAlert(msg, '⏰ Starting Soon', 'normal');
       }
 
+      // 1 min before start
+      const preStart1Key = `pre1-${item.id}`;
+      if (nowMin >= startMin - 1 && nowMin < startMin && !NOTIFIED.has(preStart1Key)) {
+        NOTIFIED.add(preStart1Key);
+        const msg = `"${item.taskTitle}" starts in 1 minute`;
+        fireAlert(msg, '⏰ Starting Now', 'urgent');
+      }
+
       // 5 min remaining
-      const preEndKey = `end5-${item.id}`;
-      if (nowMin >= endMin - 5 && nowMin < endMin && !NOTIFIED.has(preEndKey)) {
-        NOTIFIED.add(preEndKey);
+      const preEnd5Key = `end5-${item.id}`;
+      if (nowMin >= endMin - 5 && nowMin < endMin - 1 && !NOTIFIED.has(preEnd5Key)) {
+        NOTIFIED.add(preEnd5Key);
         const msg = `"${item.taskTitle}" has 5 minutes remaining`;
         fireAlert(msg, '⚡ Time Running Out', 'urgent');
+      }
+
+      // 1 min remaining
+      const preEnd1Key = `end1-${item.id}`;
+      if (nowMin >= endMin - 1 && nowMin < endMin && !NOTIFIED.has(preEnd1Key)) {
+        NOTIFIED.add(preEnd1Key);
+        const msg = `"${item.taskTitle}" has 1 minute remaining`;
+        fireAlert(msg, '⚡ Almost Done', 'urgent');
       }
 
       // Task ended

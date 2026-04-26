@@ -23,11 +23,11 @@ let pendingSchedule = null; // task waiting for duration modal
 let activeTagFilter = null; // tag id or null
 
 const QUADRANT_COLORS = {
-  do:        { bg: '#3d1515', border: '#e05a5a', text: '#f4b8b8' },
-  schedule:  { bg: '#3d2e0a', border: '#d4a843', text: '#f5d98a' },
-  delegate:  { bg: '#0a2035', border: '#5aaee0', text: '#a8d4f5' },
-  eliminate: { bg: '#1a1a2a', border: '#7a7a9a', text: '#c0c0d8' },
-  none:      { bg: '#1e1e2e', border: '#3a3a5a', text: '#c0c0d8' }
+  do:        { bg: '#2d0f3d', border: '#c45fef', text: '#e8b8ff' },
+  schedule:  { bg: '#0f2d1a', border: '#2ecc71', text: '#a8f0c0' },
+  delegate:  { bg: '#0f1f3d', border: '#3b9eff', text: '#a8d4ff' },
+  eliminate: { bg: '#2d1f0a', border: '#ff9f3b', text: '#ffd8a8' },
+  none:      { bg: '#1a2030', border: '#6b8cba', text: '#c0d0e8' }
 };
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -938,16 +938,17 @@ function openBlockEditPopover(blockId, cardEl) {
   const endMin = block.startMin + block.durationMin;
 
   const BG_MAP = {
-    '#3d2b1f': { bg: 'rgba(61,43,31,0.85)',  fg: '#c8a060' },
-    '#1f2d1f': { bg: 'rgba(31,45,31,0.85)',  fg: '#70b878' },
-    '#1a1f3d': { bg: 'rgba(26,31,61,0.85)',  fg: '#7890d4' },
-    '#2d1f3d': { bg: 'rgba(45,31,61,0.85)',  fg: '#a870c8' },
-    '#2d2018': { bg: 'rgba(45,32,24,0.85)',  fg: '#d4904a' }
+    '#coral':  { bg: 'rgba(255,107,107,0.22)', fg: '#ff6b6b' },
+    '#teal':   { bg: 'rgba(29,209,161,0.20)',  fg: '#1dd1a1' },
+    '#sky':    { bg: 'rgba(84,160,255,0.20)',  fg: '#54a0ff' },
+    '#violet': { bg: 'rgba(165,94,234,0.20)',  fg: '#a55eea' },
+    '#amber':  { bg: 'rgba(255,165,2,0.20)',   fg: '#ffa502' }
   };
   const SWATCH_COLORS = Object.keys(BG_MAP);
-  const SWATCH_DISPLAY = ['#a0522d','#3a7d44','#4a5fc1','#8b45a0','#c17a2a'];
+  const SWATCH_DISPLAY = ['#ff6b6b', '#1dd1a1', '#54a0ff', '#a55eea', '#ffa502'];
+  const SWATCH_LABELS  = ['Coral', 'Teal', 'Sky Blue', 'Violet', 'Amber'];
 
-  // Detect which color key is currently active by comparing bg
+  // Detect current color key by matching bg
   let selectedKey = SWATCH_COLORS.find(k => BG_MAP[k].bg === block.bg) || SWATCH_COLORS[0];
 
   const popover = document.createElement('div');
@@ -973,7 +974,7 @@ function openBlockEditPopover(blockId, cardEl) {
           <div class="bep-swatch${key === selectedKey ? ' active' : ''}"
                data-key="${key}"
                style="background:${SWATCH_DISPLAY[i]}"
-               title="${['Brown','Green','Blue','Purple','Amber'][i]}">
+               title="${SWATCH_LABELS[i]}">
           </div>`).join('')}
       </div>
     </div>
@@ -1115,7 +1116,7 @@ function confirmDuration() {
 }
 
 // ── Block Time Modal ──────────────────────────────────────────────────────────
-let selectedBlockColor = '#3d2b1f';
+let selectedBlockColor = '#coral';
 
 function openBlockModal() {
   const now = new Date();
@@ -1137,13 +1138,13 @@ function saveBlock() {
   if (endMin <= startMin) { alert('End must be after start'); return; }
 
   const BG_MAP = {
-    '#3d2b1f': { bg: 'rgba(61,43,31,0.85)', fg: '#c8a060' },
-    '#1f2d1f': { bg: 'rgba(31,45,31,0.85)', fg: '#70b878' },
-    '#1a1f3d': { bg: 'rgba(26,31,61,0.85)', fg: '#7890d4' },
-    '#2d1f3d': { bg: 'rgba(45,31,61,0.85)', fg: '#a870c8' },
-    '#2d2018': { bg: 'rgba(45,32,24,0.85)', fg: '#d4904a' }
+    '#coral':  { bg: 'rgba(255,107,107,0.22)', fg: '#ff6b6b' },
+    '#teal':   { bg: 'rgba(29,209,161,0.20)',  fg: '#1dd1a1' },
+    '#sky':    { bg: 'rgba(84,160,255,0.20)',  fg: '#54a0ff' },
+    '#violet': { bg: 'rgba(165,94,234,0.20)',  fg: '#a55eea' },
+    '#amber':  { bg: 'rgba(255,165,2,0.20)',   fg: '#ffa502' }
   };
-  const colors = BG_MAP[selectedBlockColor] || BG_MAP['#3d2b1f'];
+  const colors = BG_MAP[selectedBlockColor] || BG_MAP['#coral'];
 
   state.blockedTimes.push({
     id: uid(),

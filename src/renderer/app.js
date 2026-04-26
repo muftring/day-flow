@@ -695,11 +695,17 @@ function renderTimeline() {
 
     el.innerHTML = `
       <span class="block-label-text">${escHtml(block.label)}</span>
-      <button class="block-remove-btn" title="Remove">✕</button>
+      <div class="block-actions">
+        <button class="block-edit-btn" title="Edit">✎</button>
+        <button class="block-remove-btn" title="Remove">✕</button>
+      </div>
     `;
-    el.querySelector('.block-remove-btn').addEventListener('click', () => {
-      removeBlock(block.id);
+    el.querySelector('.block-remove-btn').addEventListener('click', () => removeBlock(block.id));
+    el.querySelector('.block-edit-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openBlockEditPopover(block.id, el);
     });
+    el.addEventListener('dblclick', () => openBlockEditPopover(block.id, el));
     container.appendChild(el);
   });
 
@@ -869,7 +875,115 @@ function removeBlock(id) {
   debouncedSave();
 }
 
-// ── Timeline Drag & Drop ──────────────────────────────────────────────────────
+function openBlockEditPopover(blockId, cardEl) {
+  document.querySelectorAll('.block-edit-popover').forEach(p => p.remove());
+
+  const block = state.blockedTimes.find(b => b.id === blockId);
+  if (!block) return;
+
+  const endMin = block.startMin + block.durationMin;
+
+  const BG_MAP = {
+    '#3d2b1f': { bg: 'rgba(61,43,31,0.85)',  fg: '#c8a060' },
+    '#1f2d1f': { bg: 'rgba(31,45,31,0.85)',  fg: '#70b878' },
+    '#1a1f3d': { bg: 'rgba(26,31,61,0.85)',  fg: '#7890d4' },
+    '#2d1f3d': { bg: 'rgba(45,31,61,0.85)',  fg: '#a870c8' },
+    '#2d2018': { bg: 'rgba(45,32,24,0.85)',  fg: '#d4904a' }
+  };
+  const SWATCH_COLORS = Object.keys(BG_MAP);
+  const SWATCH_DISPLAY = ['#a0522d','#3a7d44','#4a5fc1','#8b45a0','#c17a2a'];
+
+  // Detect which color key is currently active by comparing bg
+  let selectedKey = SWATCH_COLORS.find(k => BG_MAP[k].bg === block.bg) || SWATCH_COLORS[0];
+
+  const popover = document.createElement('div');
+  popover.className = 'block-edit-popover';
+  popover.innerHTML = `
+    <div class="tep-header">
+      <span class="tep-title">Edit Block</span>
+      <button class="tep-close">✕</button>
+    </div>
+    <label class="tep-label">Label
+      <input class="bep-label-input" type="text" value="${escHtml(block.label)}" />
+    </label>
+    <div class="tep-label">Time
+      <div class="bep-time-row">
+        <input class="bep-start" type="time" value="${minToTime(block.startMin)}" />
+        <span style="color:var(--text-muted)">–</span>
+        <input class="bep-end" type="time" value="${minToTime(endMin)}" />
+      </div>
+    </div>
+    <div class="tep-label">Color
+      <div class="bep-swatches">
+        ${SWATCH_COLORS.map((key, i) => `
+          <div class="bep-swatch${key === selectedKey ? ' active' : ''}"
+               data-key="${key}"
+               style="background:${SWATCH_DISPLAY[i]}"
+               title="${['Brown','Green','Blue','Purple','Amber'][i]}">
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="tep-actions">
+      <button class="tep-cancel btn-secondary">Cancel</button>
+      <button class="bep-save btn-primary">Save</button>
+    </div>
+  `;
+
+  // Swatch selection
+  popover.querySelectorAll('.bep-swatch').forEach(swatch => {
+    swatch.addEventListener('click', () => {
+      popover.querySelectorAll('.bep-swatch').forEach(s => s.classList.remove('active'));
+      swatch.classList.add('active');
+      selectedKey = swatch.dataset.key;
+    });
+  });
+
+  // Save
+  popover.querySelector('.bep-save').addEventListener('click', () => {
+    const newLabel = popover.querySelector('.bep-label-input').value.trim() || 'Blocked';
+    const newStart = timeToMin(popover.querySelector('.bep-start').value);
+    const newEnd   = timeToMin(popover.querySelector('.bep-end').value);
+    if (newEnd <= newStart) { showToast('Invalid', 'End must be after start', 'urgent'); return; }
+
+    const colors = BG_MAP[selectedKey];
+    block.label       = newLabel;
+    block.startMin    = newStart;
+    block.durationMin = newEnd - newStart;
+    block.bg          = colors.bg;
+    block.fg          = colors.fg;
+
+    popover.remove();
+    renderTimeline();
+    debouncedSave();
+  });
+
+  // Position
+  document.body.appendChild(popover);
+  const cardRect = cardEl.getBoundingClientRect();
+  const popW = 240;
+  const spaceRight = window.innerWidth - cardRect.right;
+  const left = spaceRight >= popW + 12 ? cardRect.right + 8 : cardRect.left - popW - 8;
+  const top  = Math.min(cardRect.top, window.innerHeight - popover.offsetHeight - 16);
+  popover.style.left = `${Math.max(8, left)}px`;
+  popover.style.top  = `${Math.max(8, top)}px`;
+
+  // Close
+  const close = () => popover.remove();
+  popover.querySelector('.tep-cancel').addEventListener('click', close);
+  popover.querySelector('.tep-close').addEventListener('click', close);
+  setTimeout(() => {
+    document.addEventListener('click', function handler(e) {
+      if (!popover.contains(e.target) && !cardEl.contains(e.target)) {
+        popover.remove();
+        document.removeEventListener('click', handler);
+      }
+    });
+  }, 10);
+
+  popover.querySelector('.bep-label-input').focus();
+}
+
+
 function onTimelineDragOver(e) {
   e.preventDefault();
   if (!dragPayload) return;

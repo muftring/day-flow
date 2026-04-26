@@ -635,8 +635,6 @@ html, body {
 /* Timeline Card (Task) */
 .timeline-card {
   position: absolute;
-  left: 8px;
-  right: 8px;
   border-radius: var(--radius-sm);
   padding: 6px 10px;
   cursor: pointer;
@@ -649,6 +647,7 @@ html, body {
   min-height: 28px;
   border: 1px solid transparent;
   box-shadow: var(--shadow-card);
+  box-sizing: border-box;
 }
 
 .timeline-card:hover {

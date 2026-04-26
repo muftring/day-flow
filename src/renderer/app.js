@@ -684,7 +684,7 @@ function renderTimeline() {
   const todayBlocked = state.blockedTimes.filter(b => b.date === key);
   const unit = 80;
 
-  // Blocked items
+  // Blocked items (full width, no overlap handling needed)
   todayBlocked.forEach(block => {
     const top    = minToY(block.startMin);
     const height = Math.max((block.durationMin / 60) * unit, 20);
@@ -709,20 +709,75 @@ function renderTimeline() {
     container.appendChild(el);
   });
 
-  // Task items
+  // ── Overlap layout for task items ─────────────────────────────────────────
+  // Sort by start time
+  const sorted = [...todayTItems].sort((a, b) => a.startMin - b.startMin);
+
+  // Assign each item a column within its overlap group.
+  // We track "columns" as arrays of end-times so we can slot each item into
+  // the first column whose last item has already ended.
+  const layout = []; // parallel to sorted: { col, totalCols }
+  const colEnds = []; // colEnds[c] = endMin of last item placed in column c
+
+  // First pass: assign columns
+  const itemCols = sorted.map(item => {
+    const endMin = item.startMin + item.durationMin;
+    // Find first free column
+    let col = colEnds.findIndex(e => e <= item.startMin);
+    if (col === -1) col = colEnds.length;
+    colEnds[col] = endMin;
+    return col;
+  });
+
+  // Second pass: for each item, find how many columns are active during its span
+  // (i.e. the width of the overlap group it belongs to)
+  const totalCols = sorted.map((item, i) => {
+    const end = item.startMin + item.durationMin;
+    let maxCol = itemCols[i];
+    sorted.forEach((other, j) => {
+      // overlaps if they share any time
+      if (other.startMin < end && (other.startMin + other.durationMin) > item.startMin) {
+        if (itemCols[j] > maxCol) maxCol = itemCols[j];
+      }
+    });
+    return maxCol + 1;
+  });
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   const nowMin = nowToMinutes();
-  todayTItems.forEach(item => {
-    const top    = minToY(item.startMin);
+  const GUTTER = 4; // px gap between columns
+
+  sorted.forEach((item, i) => {
+    const col   = itemCols[i];
+    const cols  = totalCols[i];
+    const top   = minToY(item.startMin);
     const height = Math.max((item.durationMin / 60) * unit, 28);
     const colors = QUADRANT_COLORS[getTaskPriority(item.taskId)] || QUADRANT_COLORS.none;
 
     const isActive = nowMin >= item.startMin && nowMin < item.startMin + item.durationMin;
-    const isPast   = nowMin >= item.startMin + item.durationMin;
 
     const el = document.createElement('div');
     el.className = 'timeline-card' + (item.completed ? ' completed' : '') + (isActive ? ' active-now' : '');
-    el.style.cssText = `top:${top}px; height:${height}px; background:${colors.bg}; border-color:${colors.border};`;
     el.dataset.id = item.id;
+
+    // Position: split the track horizontally into `cols` equal columns
+    // The track spans from left:8px to right:8px, so usable width = 100% - 16px
+    const pct     = 100 / cols;
+    const leftPct = col * pct;
+    const widthPct = pct;
+    // Apply gutter between columns (not on outermost edges)
+    const gutterLeft  = col > 0        ? GUTTER / 2 : 0;
+    const gutterRight = col < cols - 1 ? GUTTER / 2 : 0;
+
+    el.style.cssText = `
+      position: absolute;
+      top: ${top}px;
+      height: ${height}px;
+      left: calc(8px + ${leftPct}% + ${gutterLeft}px);
+      width: calc(${widthPct}% - ${gutterLeft + gutterRight}px - ${cols === 1 ? 16 : col === cols-1 ? 8 : 0}px);
+      background: ${colors.bg};
+      border-color: ${colors.border};
+    `;
 
     const endMin = item.startMin + item.durationMin;
     el.innerHTML = `
@@ -743,7 +798,6 @@ function renderTimeline() {
       });
     });
 
-    // Also open edit on double-click of the card body
     el.addEventListener('dblclick', (e) => {
       if (!e.target.closest('.tc-btn')) openTimelineEditPopover(item.id, el);
     });

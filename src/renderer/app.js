@@ -720,8 +720,7 @@ function renderTimeline() {
 
     const endMin = item.startMin + item.durationMin;
     el.innerHTML = `
-      <span class="tc-title">${escHtml(item.taskTitle)} <span class="tc-scheduled-time">(${minToTime(item.startMin)})</span></span>
-      <span class="tc-time">${minToTime(item.startMin)} – ${minToTime(endMin)}</span>
+      <span class="tc-title"><span class="tc-time">${minToTime(item.startMin)} – ${minToTime(endMin)}</span> ${escHtml(item.taskTitle)}</span>
       <div class="tc-actions">
         <button class="tc-btn" data-action="edit" title="Edit time">✎</button>
         <button class="tc-btn" data-action="complete" title="${item.completed?'Unmark':'Mark complete'}">${item.completed?'↺':'✓'}</button>

@@ -81,6 +81,10 @@
 
   <!-- Main: Timeline -->
   <main id="main-panel">
+
+    <!-- Day theme banner (absolutely positioned, upper-right) -->
+    <div id="day-banner" class="day-banner"></div>
+
     <header id="main-header">
       <div class="date-nav">
         <button id="prev-day" title="Previous day">‹</button>
@@ -92,6 +96,15 @@
         <button id="today-btn" title="Go to today">Today</button>
       </div>
       <div class="header-actions">
+        <select id="day-theme-select" title="Day theme">
+          <option value="none">Theme…</option>
+          <option value="focus">🎯 Focus</option>
+          <option value="creative">💡 Creative</option>
+          <option value="flow">🌊 Flow</option>
+          <option value="recharge">🌙 Recharge</option>
+          <option value="energy">⚡ Energy</option>
+          <option value="nature">🌿 Nature</option>
+        </select>
         <button id="theme-toggle" title="Toggle light/dark mode">
           <div class="toggle-track"><div class="toggle-thumb"></div></div>
           <span class="toggle-icon" id="theme-icon">🌙</span>
@@ -106,6 +119,23 @@
         </div>
       </div>
     </header>
+
+    <!-- Day Objectives: between date header and timeline -->
+    <div id="day-objectives" class="day-objectives">
+      <div class="obj-section-label">Objectives</div>
+      <div class="obj-row">
+        <span class="obj-num">1</span>
+        <input class="obj-input" type="text" placeholder="First objective for today…" data-idx="0" />
+      </div>
+      <div class="obj-row">
+        <span class="obj-num">2</span>
+        <input class="obj-input" type="text" placeholder="Second objective…" data-idx="1" />
+      </div>
+      <div class="obj-row">
+        <span class="obj-num">3</span>
+        <input class="obj-input" type="text" placeholder="Third objective…" data-idx="2" />
+      </div>
+    </div>
 
     <div id="timeline-scroll">
       <div id="timeline-container">

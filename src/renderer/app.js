@@ -12,6 +12,7 @@ let state = {
   timelineItems: [],  // { id, taskId, taskTitle, date, startMin, durationMin, color, completed }
   blockedTimes: [],   // { id, label, date, startMin, durationMin, bg, fg }
   tags: [],           // { id, name, color }
+  dayMeta: {},        // { 'YYYY-MM-DD': { theme: 'none', objectives: ['','',''] } }
   settings: { workStart: '08:00', workEnd: '18:00', theme: 'dark' }
 };
 
@@ -21,6 +22,99 @@ currentDate.setHours(0,0,0,0);
 let dragPayload = null;  // { type: 'task'|'timeline', data }
 let pendingSchedule = null; // task waiting for duration modal
 let activeTagFilter = null; // tag id or null
+
+// ── Day Themes ────────────────────────────────────────────────────────────────
+const DAY_THEMES = {
+  none: { label: 'Theme…', bgDark: null, bgLight: null, color: null, banner: null },
+
+  focus: {
+    label: '🎯 Focus',
+    bgDark:  'radial-gradient(ellipse 55% 45% at 100% 0%, rgba(59,90,246,0.18) 0%, transparent 100%)',
+    bgLight: 'radial-gradient(ellipse 55% 45% at 100% 0%, rgba(59,90,246,0.10) 0%, transparent 100%)',
+    color: '#3b5af6',
+    banner: `<svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="80" cy="80" r="72" stroke="currentColor" stroke-width="1.5" opacity="0.2"/>
+      <circle cx="80" cy="80" r="52" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+      <circle cx="80" cy="80" r="32" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+      <circle cx="80" cy="80" r="14" fill="currentColor" opacity="0.45"/>
+      <line x1="80" y1="0" x2="80" y2="160" stroke="currentColor" stroke-width="1" opacity="0.1"/>
+      <line x1="0" y1="80" x2="160" y2="80" stroke="currentColor" stroke-width="1" opacity="0.1"/>
+    </svg>`
+  },
+
+  creative: {
+    label: '💡 Creative',
+    bgDark:  'radial-gradient(ellipse 55% 45% at 100% 0%, rgba(212,168,67,0.18) 0%, transparent 100%)',
+    bgLight: 'radial-gradient(ellipse 55% 45% at 100% 0%, rgba(212,168,67,0.11) 0%, transparent 100%)',
+    color: '#d4a843',
+    banner: `<svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M80 20 C55 20 36 40 36 66 C36 86 48 100 62 112 L62 124 L98 124 L98 112 C112 100 124 86 124 66 C124 40 105 20 80 20Z" stroke="currentColor" stroke-width="2" opacity="0.45"/>
+      <line x1="65" y1="128" x2="95" y2="128" stroke="currentColor" stroke-width="2" opacity="0.35"/>
+      <line x1="68" y1="135" x2="92" y2="135" stroke="currentColor" stroke-width="2" opacity="0.28"/>
+      <path d="M72 72 Q80 58 88 72" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+      <line x1="80" y1="8" x2="80" y2="14" stroke="currentColor" stroke-width="2" opacity="0.22" stroke-linecap="round"/>
+      <line x1="47" y1="19" x2="51" y2="24" stroke="currentColor" stroke-width="2" opacity="0.18" stroke-linecap="round"/>
+      <line x1="113" y1="19" x2="109" y2="24" stroke="currentColor" stroke-width="2" opacity="0.18" stroke-linecap="round"/>
+      <line x1="24" y1="52" x2="30" y2="54" stroke="currentColor" stroke-width="2" opacity="0.16" stroke-linecap="round"/>
+      <line x1="136" y1="52" x2="130" y2="54" stroke="currentColor" stroke-width="2" opacity="0.16" stroke-linecap="round"/>
+    </svg>`
+  },
+
+  flow: {
+    label: '🌊 Flow',
+    bgDark:  'radial-gradient(ellipse 55% 45% at 100% 0%, rgba(63,212,196,0.15) 0%, transparent 100%)',
+    bgLight: 'radial-gradient(ellipse 55% 45% at 100% 0%, rgba(63,212,196,0.09) 0%, transparent 100%)',
+    color: '#3fd4c4',
+    banner: `<svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10 36 Q40 16 80 36 Q120 56 150 36" stroke="currentColor" stroke-width="2.5" opacity="0.28" stroke-linecap="round"/>
+      <path d="M10 66 Q40 46 80 66 Q120 86 150 66" stroke="currentColor" stroke-width="2.5" opacity="0.38" stroke-linecap="round"/>
+      <path d="M10 96 Q40 76 80 96 Q120 116 150 96" stroke="currentColor" stroke-width="2.5" opacity="0.42" stroke-linecap="round"/>
+      <path d="M10 126 Q40 106 80 126 Q120 146 150 126" stroke="currentColor" stroke-width="2.5" opacity="0.32" stroke-linecap="round"/>
+    </svg>`
+  },
+
+  recharge: {
+    label: '🌙 Recharge',
+    bgDark:  'radial-gradient(ellipse 55% 45% at 100% 0%, rgba(165,94,234,0.18) 0%, transparent 100%)',
+    bgLight: 'radial-gradient(ellipse 55% 45% at 100% 0%, rgba(165,94,234,0.10) 0%, transparent 100%)',
+    color: '#a55eea',
+    banner: `<svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M95 24 C64 30 44 58 44 90 C44 122 64 148 95 154 C70 144 52 118 52 90 C52 62 70 36 95 24Z" fill="currentColor" opacity="0.4"/>
+      <circle cx="120" cy="35" r="4" fill="currentColor" opacity="0.45"/>
+      <circle cx="142" cy="60" r="3" fill="currentColor" opacity="0.35"/>
+      <circle cx="132" cy="82" r="2" fill="currentColor" opacity="0.3"/>
+      <circle cx="110" cy="22" r="2.5" fill="currentColor" opacity="0.4"/>
+      <circle cx="148" cy="43" r="2" fill="currentColor" opacity="0.28"/>
+      <circle cx="125" cy="50" r="1.5" fill="currentColor" opacity="0.22"/>
+    </svg>`
+  },
+
+  energy: {
+    label: '⚡ Energy',
+    bgDark:  'radial-gradient(ellipse 55% 45% at 100% 0%, rgba(255,165,2,0.18) 0%, transparent 100%)',
+    bgLight: 'radial-gradient(ellipse 55% 45% at 100% 0%, rgba(255,165,2,0.10) 0%, transparent 100%)',
+    color: '#ffa502',
+    banner: `<svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M96 15 L48 86 L82 86 L64 145 L118 66 L84 66 Z"
+            stroke="currentColor" stroke-width="2"
+            fill="currentColor" fill-opacity="0.12"
+            opacity="0.65" stroke-linejoin="round"/>
+    </svg>`
+  },
+
+  nature: {
+    label: '🌿 Nature',
+    bgDark:  'radial-gradient(ellipse 55% 45% at 100% 0%, rgba(46,204,113,0.15) 0%, transparent 100%)',
+    bgLight: 'radial-gradient(ellipse 55% 45% at 100% 0%, rgba(46,204,113,0.09) 0%, transparent 100%)',
+    color: '#2ecc71',
+    banner: `<svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M80 148 L80 68" stroke="currentColor" stroke-width="2.5" opacity="0.35" stroke-linecap="round"/>
+      <path d="M80 90 C80 90 44 74 26 44 C54 42 76 60 80 90Z" fill="currentColor" opacity="0.38"/>
+      <path d="M80 68 C80 68 116 48 138 18 C110 18 84 38 80 68Z" fill="currentColor" opacity="0.32"/>
+      <path d="M80 112 C80 112 50 100 36 78 C62 76 78 94 80 112Z" fill="currentColor" opacity="0.26"/>
+    </svg>`
+  }
+};
 
 const QUADRANT_COLORS = {
   do:        { bg: '#2d0f3d', border: '#c45fef', text: '#e8b8ff' },
@@ -50,6 +144,7 @@ async function loadData() {
       state.timelineItems = saved.timelineItems|| [];
       state.blockedTimes  = saved.blockedTimes || [];
       state.tags          = saved.tags         || [];
+      state.dayMeta       = saved.dayMeta      || {};
       if (saved.settings)  state.settings = { ...state.settings, ...saved.settings };
     }
   } catch(e) { console.warn('Load failed', e); }
@@ -62,6 +157,7 @@ async function saveData() {
       timelineItems: state.timelineItems,
       blockedTimes: state.blockedTimes,
       tags: state.tags,
+      dayMeta: state.dayMeta,
       settings: state.settings
     });
   } catch(e) { console.warn('Save failed', e); }
@@ -89,6 +185,7 @@ function applyTheme(theme) {
     if (label) label.textContent = 'Dark';
   }
   state.settings.theme = theme;
+  applyDayTheme(getDayMeta().theme || 'none');
 }
 
 function toggleTheme() {
@@ -98,6 +195,49 @@ function toggleTheme() {
 }
 
 
+// ── Day Meta (theme + objectives) ────────────────────────────────────────────
+function getDayMeta(date) {
+  const key = dateKey(date || currentDate);
+  if (!state.dayMeta[key]) {
+    state.dayMeta[key] = { theme: 'none', objectives: ['', '', ''] };
+  }
+  return state.dayMeta[key];
+}
+
+function applyDayTheme(themeKey) {
+  const theme = DAY_THEMES[themeKey] || DAY_THEMES.none;
+  const panel  = document.getElementById('main-panel');
+  const banner = document.getElementById('day-banner');
+  const isLight = state.settings.theme === 'light';
+
+  panel.style.backgroundImage = theme.bgDark
+    ? (isLight ? theme.bgLight : theme.bgDark)
+    : '';
+
+  if (theme.banner && banner) {
+    banner.innerHTML  = theme.banner;
+    banner.style.color = theme.color;
+    banner.classList.remove('day-banner--hidden');
+  } else if (banner) {
+    banner.innerHTML = '';
+    banner.classList.add('day-banner--hidden');
+  }
+}
+
+function renderDayMeta() {
+  const meta = getDayMeta();
+
+  const sel = document.getElementById('day-theme-select');
+  if (sel) sel.value = meta.theme || 'none';
+
+  document.querySelectorAll('.obj-input').forEach(input => {
+    const idx = parseInt(input.dataset.idx);
+    input.value = (meta.objectives && meta.objectives[idx]) || '';
+  });
+
+  applyDayTheme(meta.theme || 'none');
+}
+
 function renderAll() {
   renderDateHeader();
   renderTagFilterBar();
@@ -105,6 +245,7 @@ function renderAll() {
   renderMatrix();
   renderTimeline();
   applyWorkHours();
+  renderDayMeta();
 }
 
 // ── Date Helpers ──────────────────────────────────────────────────────────────
@@ -1450,6 +1591,24 @@ function bindEvents() {
 
   // Refresh calendar
   document.getElementById('refresh-calendar-btn').addEventListener('click', fetchCalendar);
+
+  // Day theme selector
+  document.getElementById('day-theme-select').addEventListener('change', e => {
+    const meta = getDayMeta();
+    meta.theme = e.target.value;
+    applyDayTheme(meta.theme);
+    debouncedSave();
+  });
+
+  // Day objectives
+  document.querySelectorAll('.obj-input').forEach(input => {
+    input.addEventListener('input', () => {
+      const meta = getDayMeta();
+      if (!meta.objectives) meta.objectives = ['', '', ''];
+      meta.objectives[parseInt(input.dataset.idx)] = input.value;
+      debouncedSave();
+    });
+  });
 
   // Scroll timeline to work start
   setTimeout(() => {

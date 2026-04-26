@@ -1461,3 +1461,112 @@ html, body {
   gap: 8px;
   justify-content: flex-end;
 }
+
+/* ── Day Theme ─────────────────────────────────────────────────────────────── */
+#main-panel {
+  position: relative;
+}
+
+/* Banner: large decorative SVG in the upper-right corner */
+.day-banner {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 200px;
+  height: 200px;
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 0.3s;
+}
+
+.day-banner.day-banner--hidden {
+  opacity: 0;
+}
+
+.day-banner svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Header and objectives must sit above the banner */
+#main-header {
+  position: relative;
+  z-index: 1;
+}
+
+/* Theme dropdown in the header */
+#day-theme-select {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  padding: 5px 10px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+#day-theme-select:hover {
+  border-color: var(--border-mid);
+  color: var(--text-primary);
+}
+
+/* ── Day Objectives ────────────────────────────────────────────────────────── */
+.day-objectives {
+  padding: 10px 24px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  position: relative;
+  z-index: 1;
+  transition: background 0.2s;
+}
+
+.obj-section-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.obj-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.obj-num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent-gold);
+  opacity: 0.65;
+  width: 10px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.obj-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 3px 2px;
+  outline: none;
+  transition: border-color 0.15s;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.obj-input::placeholder { color: var(--text-muted); font-style: italic; }
+.obj-input:focus { border-bottom-color: var(--accent-gold); }

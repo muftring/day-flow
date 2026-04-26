@@ -137,3 +137,7 @@ You can back this file up or sync it with any tool you like.
 ## License
 
 MIT — build freely.
+
+---
+
+*This app was written using [Claude.ai](https://claude.ai).*

@@ -974,7 +974,7 @@ function renderTimeline() {
 
     const endMin = item.startMin + item.durationMin;
     el.innerHTML = `
-      <span class="tc-title"><span class="tc-time">${minToTime(item.startMin)} – ${minToTime(endMin)}</span> ${escHtml(item.taskTitle)}</span>
+      <span class="tc-title"><span class="tc-time">${minToTime(item.startMin)} – ${minToTime(endMin)}</span><span class="tc-task-title"> ${escHtml(item.taskTitle)}</span></span>
       <div class="tc-actions">
         <button class="tc-btn" data-action="edit" title="Edit time">✎</button>
         <button class="tc-btn" data-action="complete" title="${item.completed?'Unmark':'Mark complete'}">${item.completed?'↺':'✓'}</button>
@@ -991,8 +991,48 @@ function renderTimeline() {
       });
     });
 
+    // Double-click title → inline rename
+    el.querySelector('.tc-task-title').addEventListener('dblclick', e => {
+      e.stopPropagation();
+      const task = state.tasks.find(t => t.id === item.taskId);
+      if (!task) return;
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = item.taskTitle;
+      input.className = 'tc-title-edit';
+
+      let committed = false;
+      const commit = () => {
+        if (committed) return;
+        committed = true;
+        const val = input.value.trim();
+        if (val && val !== task.title) renameTask(task.id, val);
+        else renderTimeline();
+      };
+      const cancel = () => {
+        if (committed) return;
+        committed = true;
+        renderTimeline();
+      };
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter')  { e.preventDefault(); commit(); }
+        if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+        e.stopPropagation();
+      });
+      input.addEventListener('blur', commit);
+      input.addEventListener('click', e => e.stopPropagation());
+
+      e.currentTarget.replaceWith(input);
+      input.focus();
+      input.select();
+    });
+
+    // Double-click anywhere else → edit time/duration
     el.addEventListener('dblclick', (e) => {
-      if (!e.target.closest('.tc-btn')) openTimelineEditPopover(item.id, el);
+      if (!e.target.closest('.tc-btn') && !e.target.closest('.tc-task-title')) {
+        openTimelineEditPopover(item.id, el);
+      }
     });
 
     container.appendChild(el);

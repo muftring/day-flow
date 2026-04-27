@@ -1594,3 +1594,23 @@ html, body {
 .task-title-edit:focus {
   border-color: var(--accent-gold);
 }
+
+.tc-task-title {
+  cursor: text;
+}
+
+.tc-title-edit {
+  background: rgba(0,0,0,0.35);
+  border: 1px solid var(--accent-gold);
+  border-radius: 3px;
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0 5px;
+  outline: none;
+  min-width: 60px;
+  width: calc(100% - 10px);
+  user-select: text;
+  -webkit-user-select: text;
+}

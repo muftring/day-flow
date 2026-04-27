@@ -215,6 +215,36 @@
   </div>
 </div>
 
+<!-- Plan Task Modal -->
+<div id="plan-modal-overlay" class="modal-overlay hidden">
+  <div class="modal" id="plan-modal">
+    <h2>Plan Task</h2>
+    <label>Task
+      <select id="plan-task-select">
+        <option value="">— choose a task —</option>
+      </select>
+    </label>
+    <label>Start time <input id="plan-start" type="time" /></label>
+    <label>Duration
+      <div class="duration-picker">
+        <button class="plan-dur-btn" data-min="15">15m</button>
+        <button class="plan-dur-btn" data-min="30">30m</button>
+        <button class="plan-dur-btn" data-min="45">45m</button>
+        <button class="plan-dur-btn" data-min="60">1h</button>
+        <button class="plan-dur-btn" data-min="90">1.5h</button>
+        <button class="plan-dur-btn" data-min="120">2h</button>
+      </div>
+      <div class="duration-custom">
+        <input id="plan-minutes" type="number" min="5" max="480" value="30" /> minutes
+      </div>
+    </label>
+    <div class="modal-actions">
+      <button id="plan-cancel-btn" class="btn-secondary">Cancel</button>
+      <button id="plan-save-btn" class="btn-primary">Add to Today</button>
+    </div>
+  </div>
+</div>
+
 <script src="app.js"></script>
 </body>
 </html>

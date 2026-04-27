@@ -1684,6 +1684,45 @@ function bindEvents() {
   // Refresh calendar
   document.getElementById('refresh-calendar-btn').addEventListener('click', fetchCalendar);
 
+  // Plan Task modal
+  document.getElementById('plan-cancel-btn').addEventListener('click', closePlanModal);
+  document.getElementById('plan-save-btn').addEventListener('click', confirmPlan);
+
+  document.querySelectorAll('.plan-dur-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.plan-dur-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('plan-minutes').value = btn.dataset.min;
+    });
+  });
+
+  document.getElementById('plan-minutes').addEventListener('input', () => {
+    document.querySelectorAll('.plan-dur-btn').forEach(b => b.classList.remove('active'));
+  });
+
+  document.getElementById('plan-modal-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('plan-modal-overlay')) closePlanModal();
+  });
+
+  // Tray menu actions
+  if (window.electronAPI.onTrayAction) {
+    window.electronAPI.onTrayAction(action => {
+      if (action === 'add-task') {
+        const input = document.getElementById('new-task-input');
+        input?.focus();
+      }
+      if (action === 'plan-task') {
+        openPlanModal();
+      }
+      if (action === 'show-today') {
+        currentDate = new Date();
+        currentDate.setHours(0, 0, 0, 0);
+        renderAll();
+        fetchCalendar();
+      }
+    });
+  }
+
   // Day theme selector
   document.getElementById('day-theme-select').addEventListener('change', e => {
     const meta = getDayMeta();
@@ -1707,6 +1746,64 @@ function bindEvents() {
     const scroll = document.getElementById('timeline-scroll');
     if (scroll) scroll.scrollTop = 0;
   }, 100);
+}
+
+// ── Plan Task Modal ───────────────────────────────────────────────────────────
+
+function openPlanModal() {
+  // Populate task select with incomplete tasks
+  const sel = document.getElementById('plan-task-select');
+  sel.innerHTML = '<option value="">— choose a task —</option>';
+  state.tasks
+    .filter(t => !t.completed)
+    .forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.title;
+      sel.appendChild(opt);
+    });
+
+  // Default start time: next rounded 30-min slot
+  const now = new Date();
+  const roundedMin = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30) * 30;
+  document.getElementById('plan-start').value = minToTime(roundedMin);
+  document.getElementById('plan-minutes').value = 30;
+  document.querySelectorAll('.plan-dur-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('.plan-dur-btn[data-min="30"]')?.classList.add('active');
+
+  document.getElementById('plan-modal-overlay').classList.remove('hidden');
+  sel.focus();
+}
+
+function closePlanModal() {
+  document.getElementById('plan-modal-overlay').classList.add('hidden');
+}
+
+function confirmPlan() {
+  const taskId = document.getElementById('plan-task-select').value;
+  if (!taskId) { showToast('No task selected', 'Please choose a task to plan.', 'urgent'); return; }
+
+  const task = state.tasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  const startMin = timeToMin(document.getElementById('plan-start').value);
+  const durMin   = parseInt(document.getElementById('plan-minutes').value) || 30;
+
+  state.timelineItems.push({
+    id: uid(),
+    taskId: task.id,
+    taskTitle: task.title,
+    date: dateKey(currentDate),
+    startMin,
+    durationMin: durMin,
+    completed: false
+  });
+
+  closePlanModal();
+  renderTimeline();
+  renderTaskList();
+  debouncedSave();
+  showToast('Planned', `"${task.title}" → ${minToTime(startMin)}`, 'info');
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────

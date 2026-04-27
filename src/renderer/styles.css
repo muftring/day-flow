@@ -1614,3 +1614,20 @@ html, body {
   user-select: text;
   -webkit-user-select: text;
 }
+
+/* Plan Task modal select */
+#plan-task-select {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 8px 10px;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s;
+  cursor: pointer;
+}
+
+#plan-task-select:focus { border-color: var(--accent-gold-dim); }

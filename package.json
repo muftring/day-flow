@@ -6,7 +6,8 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --mac",
-    "pack": "electron-builder --dir"
+    "pack": "electron-builder --dir",
+    "make-icon": "rsvg-convert -w 1024 -h 1024 assets/icon.svg -o assets/icon.png && rsvg-convert -w 44 -h 44 assets/tray-icon.svg -o assets/tray-icon.png"
   },
   "devDependencies": {
     "electron": "^29.0.0",
@@ -17,6 +18,7 @@
     "productName": "DayFlow",
     "mac": {
       "category": "public.app-category.productivity",
+      "icon": "assets/icon.png",
       "target": ["dmg", "zip"]
     },
     "directories": {

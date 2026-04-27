@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Notification, nativeTheme } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, nativeTheme, Tray, Menu, nativeImage, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -6,16 +6,24 @@ const fs = require('fs');
 const dataPath = path.join(app.getPath('userData'), 'dayflow-data.json');
 
 let mainWindow;
+let tray;
+
+// ── Window ─────────────────────────────────────────────────────────────────────
 
 function createWindow() {
+  const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
+  const iconExists = fs.existsSync(iconPath);
+
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
     minWidth: 1100,
     minHeight: 700,
+    title: 'Day Flow',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
     backgroundColor: '#0f0f13',
+    icon: iconExists ? iconPath : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -28,22 +36,139 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+    if (iconExists && process.platform === 'darwin') {
+      app.dock.setIcon(nativeImage.createFromPath(iconPath));
+    }
   });
 
-  // Open DevTools in development
-  // mainWindow.webContents.openDevTools();
+  // Keep title in sync (renderer shouldn't override it)
+  mainWindow.on('page-title-updated', e => e.preventDefault());
 }
+
+// ── Tray ───────────────────────────────────────────────────────────────────────
+
+function createTray() {
+  const trayIconPath = path.join(__dirname, '..', 'assets', 'tray-icon.png');
+  let trayImage;
+
+  if (fs.existsSync(trayIconPath)) {
+    trayImage = nativeImage.createFromPath(trayIconPath);
+    trayImage = trayImage.resize({ width: 22, height: 22 });
+    trayImage.setTemplateImage(true);
+  } else {
+    // Minimal 1×1 fallback so Tray doesn't crash
+    trayImage = nativeImage.createEmpty();
+  }
+
+  tray = new Tray(trayImage);
+  tray.setToolTip('Day Flow');
+  tray.setContextMenu(buildTrayMenu());
+
+  // Rebuild menu when clicked so task list stays current
+  tray.on('click', () => {
+    tray.setContextMenu(buildTrayMenu());
+    tray.popUpContextMenu();
+  });
+}
+
+function buildTrayMenu() {
+  return Menu.buildFromTemplate([
+    {
+      label: 'Add Task…',
+      accelerator: 'CmdOrCtrl+N',
+      click: () => {
+        showOrFocus();
+        mainWindow.webContents.send('tray-action', 'add-task');
+      }
+    },
+    {
+      label: 'Plan Task…',
+      accelerator: 'CmdOrCtrl+P',
+      click: () => {
+        showOrFocus();
+        mainWindow.webContents.send('tray-action', 'plan-task');
+      }
+    },
+    {
+      label: 'Show Today',
+      accelerator: 'CmdOrCtrl+T',
+      click: () => {
+        showOrFocus();
+        mainWindow.webContents.send('tray-action', 'show-today');
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'About Day Flow…',
+      click: () => showAboutDialog()
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit Day Flow',
+      accelerator: 'CmdOrCtrl+Q',
+      click: () => app.quit()
+    }
+  ]);
+}
+
+function showOrFocus() {
+  if (!mainWindow) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function showAboutDialog() {
+  showOrFocus();
+
+  const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
+  const options = {
+    type: 'none',
+    title: 'About Day Flow',
+    message: 'Day Flow',
+    detail: [
+      `Version ${app.getVersion()}`,
+      '',
+      'A daily task and timeline manager.',
+      'Plan your day with clarity and focus.',
+      '',
+      `© ${new Date().getFullYear()} Day Flow`
+    ].join('\n'),
+    buttons: ['OK'],
+    defaultId: 0
+  };
+
+  if (fs.existsSync(iconPath)) {
+    options.icon = nativeImage.createFromPath(iconPath).resize({ width: 64, height: 64 });
+  }
+
+  dialog.showMessageBox(mainWindow, options);
+}
+
+// ── App lifecycle ──────────────────────────────────────────────────────────────
+
+app.setName('Day Flow');
 
 app.whenReady().then(() => {
   createWindow();
+  createTray();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    else showOrFocus();
   });
 });
 
 app.on('window-all-closed', () => {
+  // On macOS keep running in tray when all windows are closed
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', () => {
+  if (tray) tray.destroy();
 });
 
 // ── Data persistence ──────────────────────────────────────────────────────────
@@ -94,7 +219,6 @@ ipcMain.handle('fetch-calendar-events', async (_, { year, month, day }) => {
   const { promisify } = require('util');
   const execAsync = promisify(exec);
 
-  // Build AppleScript using numeric date components to avoid locale issues
   const script = `
 tell application "Calendar"
   set dayStart to current date

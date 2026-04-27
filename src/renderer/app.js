@@ -363,6 +363,12 @@ function renderTaskList() {
       });
     });
 
+    // Inline title edit on double-click
+    li.querySelector('.task-title')?.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      startInlineEdit(task, e.currentTarget);
+    });
+
     // Action buttons
     li.querySelectorAll('.task-action-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -410,6 +416,52 @@ function addTask(title) {
   renderTaskList();
   renderMatrix();
   debouncedSave();
+}
+
+function renameTask(id, newTitle) {
+  const task = state.tasks.find(t => t.id === id);
+  if (!task || !newTitle.trim()) return;
+  task.title = newTitle.trim();
+  state.timelineItems.filter(i => i.taskId === id).forEach(i => i.taskTitle = task.title);
+  renderTaskList();
+  renderMatrix();
+  renderTimeline();
+  debouncedSave();
+}
+
+function startInlineEdit(task, titleEl) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = task.title;
+  input.className = 'task-title-edit';
+
+  let committed = false;
+
+  const commit = () => {
+    if (committed) return;
+    committed = true;
+    const val = input.value.trim();
+    if (val && val !== task.title) renameTask(task.id, val);
+    else renderTaskList();
+  };
+
+  const cancel = () => {
+    if (committed) return;
+    committed = true;
+    renderTaskList();
+  };
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+    e.stopPropagation();
+  });
+  input.addEventListener('blur', commit);
+  input.addEventListener('click', e => e.stopPropagation());
+
+  titleEl.replaceWith(input);
+  input.focus();
+  input.select();
 }
 
 function deleteTask(id) {
